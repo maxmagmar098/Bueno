@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Corrector Ortográfico</title>
+<style>
+body {
+font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+margin: 0;
+padding: 20px;
+background-color: #f5f5f5;
+color: #333;
+}
+.container {
+max-width: 800px;
+margin: 0 auto;
+background-color: white;
+padding: 20px;
+border-radius: 8px;
+box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+h1 {
+text-align: center;
+color: #2c3e50;
+margin-bottom: 20px;
+}
+textarea {
+width: 100%;
+min-height: 120px;
+padding: 10px;
+border: 1px solid #ddd;
+border-radius: 4px;
+font-size: 16px;
+resize: vertical;
+margin-bottom: 15px;
+}
+button {
+background-color: #3498db;
+color: white;
+border: none;
+padding: 10px 15px;
+border-radius: 4px;
+cursor: pointer;
+font-size: 16px;
+transition: background-color 0.3s;
+}
+button:hover {
+background-color: #2980b9;
+}
+.stats {
+display: flex;
+justify-content: space-between;
+margin: 20px 0;
+padding: 15px;
+background-color: #f9f9f9;
+border-radius: 4px;
+border-left: 4px solid #3498db;
+}
+.stat-item {
+text-align: center;
+}
+.stat-value {
+font-size: 24px;
+font-weight: bold;
+color: #2c3e50;
+}
+.stat-label {
+font-size: 14px;
+color: #7f8c8d;
+}
+.correction-results {
+margin-top: 20px;
+}
+.suggestion {
+margin-bottom: 10px;
+padding: 10px;
+background-color: #f8f9fa;
+border-left: 3px solid #e74c3c;
+border-radius: 0 4px 4px 0;
+}
+.suggestion-original {
+font-weight: bold;
+color: #e74c3c;
+}
+.suggestion-replacement {
+color: #27ae60;
+font-weight: bold;
+}
+.corrected-text {
+margin-top: 20px;
+padding: 15px;
+background-color: #f0f8ff;
+border-radius: 4px;
+border-left: 4px solid #27ae60;
+}
+.error-word {
+text-decoration: underline wavy #e74c3c;
+position: relative;
+cursor: pointer;
+}
+.error-tooltip {
+display: none;
+position: absolute;
+bottom: 100%;
+left: 0;
+background-color: white;
+padding: 5px 10px;
+border-radius: 4px;
+box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+z-index: 10;
+white-space: nowrap;
+font-size: 14px;
+}
+.error-word:hover .error-tooltip {
+display: block;
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>Corrector Ortográfico</h1>
+<textarea id="textInput" placeholder="Escribe tu texto aquí para corregirlo..."></textarea>
+<button id="checkButton">Corregir Texto</button>
+
+```
+    <div class="stats">
+        <div class="stat-item">
+            <div class="stat-value" id="wordCount">0</div>
+            <div class="stat-label">Palabras Totales</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="errorCount">0</div>
+            <div class="stat-label">Errores Encontrados</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="errorPercentage">0%</div>
+            <div class="stat-label">Porcentaje de Errores</div>
+        </div>
+    </div>
+
+    <div id="correctionResults" class="correction-results"></div>
+    <div id="correctedText" class="corrected-text" style="display: none;"></div>
+</div>
+
+<script>
+    // Diccionario básico con palabras correctas comunes en español
+    const palabrasCorrectas = [
+        "el", "la", "los", "las", "un", "una", "unos", "unas", "y", "o", "a", "ante", "bajo", "con", "de", "desde",
+        "en", "entre", "hacia", "hasta", "para", "por", "según", "sin", "sobre", "tras", "que", "quien", "como",
+        "cuando", "donde", "yo", "tú", "él", "ella", "nosotros", "vosotros", "ellos", "ellas", "mi", "tu", "su",
+        "nuestro", "vuestro", "muy", "más", "menos", "tan", "esto", "eso", "aquello", "sí", "no", "tal", "vez",
+        "quizás", "también", "ya", "siempre", "nunca", "hoy", "ayer", "mañana", "aquí", "allí", "este", "ese", "aquel",
+        "pequeño", "niño", "quiso", "queso", "casa", "perro", "gato", "amigo", "comida", "agua", "persona", "ciudad",
+        "país", "trabajo", "escuela", "universidad", "familia", "hijo", "hija", "padre", "madre", "hermano", "hermana",
+        "abuelo", "abuela", "tío", "tía", "primo", "prima", "sobrino", "sobrina", "esposo", "esposa", "novio", "novia",
+        "hombre", "mujer", "niño", "niña", "adulto", "adulta", "joven", "anciano", "anciana", "señor", "señora", "doctor",
+        "doctora", "profesor", "profesora", "estudiante", "alumno", "alumna", "compañero", "compañera", "amigo", "amiga",
+        "vecino", "vecina", "colega", "conocido", "conocida", "extraño", "extraña", "enemigo", "enemiga", "tiempo", "día",
+        "semana", "mes", "año", "hora", "minuto", "segundo", "mañana", "tarde", "noche", "ayer", "hoy", "mañana", "pasado",
+        "presente", "futuro", "edad", "época", "momento", "instante", "periodo", "ciclo", "eternidad", "calendario", "fecha",
+        "festivo", "feriado", "vacaciones", "cumpleaños", "aniversario", "boda", "funeral", "lugar", "sitio", "espacio",
+        "punto", "zona", "área", "región", "territorio", "país", "nación", "estado", "ciudad", "pueblo", "barrio", "calle",
+        "avenida", "carretera", "camino", "ruta", "dirección", "distancia", "lejanía", "proximidad", "arriba", "abajo",
+        "delante", "detrás", "encima", "debajo", "adentro", "afuera", "color", "forma", "tamaño", "peso", "altura", "anchura",
+        "profundidad", "volumen", "dimensión", "textura", "consistencia", "diámetro", "radio", "longitud", "extensión",
+        "superficie", "color", "blanco", "negro", "gris", "rojo", "verde", "azul", "amarillo", "naranja", "rosa", "morado",
+        "púrpura", "marrón", "claro", "oscuro", "brillante", "opaco", "cantidad", "número", "cifra", "total", "parte",
+        "mayoría", "minoría", "resto", "conjunto", "colección", "grupo", "serie", "secuencia", "orden", "organización",
+        "sistema", "estructura", "unidad", "elemento", "componente", "accesorio", "objeto", "cosa", "artículo", "producto",
+        "material", "sustancia", "líquido", "sólido", "gas", "metal", "plástico", "madera", "tela", "papel", "cristal",
+        "vidrio", "cerámica", "piedra", "arena", "tierra", "aire", "fuego", "agua", "mar", "océano", "río", "lago", "laguna",
+        "charco", "lluvia", "nieve", "granizo", "hielo", "vapor", "humedad", "sequedad", "temperatura", "calor", "frío",
+        "clima", "ambiente", "atmósfera", "cielo", "sol", "luna", "estrella", "planeta", "satélite", "tierra", "mundo",
+        "universo", "cosmos", "galaxia", "cometa", "meteorito", "planta", "árbol", "flor", "hierba", "arbusto", "hoja",
+        "raíz", "tallo", "rama", "fruto", "semilla", "vegetal", "animal", "mamífero", "ave", "pez", "reptil", "anfibio",
+        "insecto", "bacteria", "virus", "célula", "órgano", "tejido", "hueso", "músculo", "sangre", "piel", "cuerpo",
+        "cabeza", "cara", "ojo", "nariz", "boca", "oreja", "pelo", "cuello", "hombro", "brazo", "codo", "muñeca", "mano",
+        "dedo", "uña", "pecho", "espalda", "cintura", "cadera", "pierna", "rodilla", "tobillo", "pie", "salud", "enfermedad",
+        "medicina", "tratamiento", "síntoma", "dolor", "fiebre", "tos", "resfriado", "herida", "dieta", "ejercicio", "deporte",
+        "descanso", "sueño", "alimentación", "hambre", "sed", "ropa", "vestido", "pantalón", "camisa", "falda", "chaqueta",
+        "abrigo", "calcetín", "zapato", "bota", "gorro", "sombrero", "gafas", "reloj", "joya", "anillo", "collar", "pendiente",
+        "pulsera", "dinero", "billete", "moneda", "cuenta", "banco", "precio", "costo", "valor", "compra", "venta", "oferta",
+        "demanda", "ganancia", "pérdida", "impuesto", "alimento", "comida", "bebida", "desayuno", "almuerzo", "cena", "merienda",
+        "postre", "plato", "menú", "receta", "ingrediente", "sabor", "cocina", "casa", "hogar", "vivienda", "habitación",
+        "cocina", "baño", "dormitorio", "salón", "comedor", "jardín", "garaje", "techo", "pared", "suelo", "puerta", "ventana",
+        "escalera", "mueble", "mesa", "silla", "sofá", "cama", "armario", "estante", "aparato", "máquina", "herramienta",
+        "instrumento", "utensilio", "equipo", "dispositivo", "mecanismo", "motor", "transporte", "vehículo", "coche", "autobús",
+        "tren", "avión", "barco", "bicicleta", "moto", "camión", "metro", "tranvía", "taxi", "viaje", "trayecto", "ruta",
+        "ida", "vuelta", "salida", "llegada", "estación", "aeropuerto", "puerto", "carretera", "calle", "comunicación",
+        "lenguaje", "idioma", "palabra", "frase", "oración", "texto", "libro", "revista", "periódico", "carta", "mensaje",
+        "correo", "teléfono", "radio", "televisión", "internet", "red", "web", "página", "sitio", "blog", "foro", "chat",
+        "educación", "enseñanza", "aprendizaje", "estudio", "clase", "curso", "examen", "prueba", "nota", "título", "diploma",
+        "certificado", "trabajo", "empleo", "oficio", "profesión", "ocupación", "carrera", "negocio", "empresa", "compañía",
+        "industria", "fábrica", "taller", "oficina", "despacho", "tienda", "comercio", "mercado", "cliente", "proveedor",
+        "jefe", "empleado", "obrero", "compañero", "colega", "arte", "música", "pintura", "escultura", "literatura", "poesía",
+        "teatro", "cine", "danza", "dibujo", "fotografía", "diseño", "moda", "estilo", "cultura", "historia", "tradición",
+        "costumbre", "hábito", "fiesta", "celebración", "ceremonia", "ritual", "religión", "creencia", "fe", "dios", "iglesia",
+        "templo", "oración", "pensamiento", "idea", "concepto", "opinión", "creencia", "duda", "certeza", "verdad", "mentira",
+        "realidad", "ficción", "fantasía", "sueño", "información", "dato", "conocimiento", "sabiduría", "inteligencia",
+        "razón", "lógica", "sentido", "comprensión", "entendimiento", "memoria", "recuerdo", "olvido", "sentimiento", "emoción",
+        "sensación", "percepción", "alegría", "tristeza", "miedo", "enfado", "sorpresa", "amor", "odio", "pasión", "deseo",
+        "voluntad", "intención", "propósito", "objetivo", "meta", "plan", "proyecto", "tarea", "actividad", "acción", "acto",
+        "hecho", "suceso", "evento", "situación", "caso", "condición", "estado", "aspecto", "naturaleza", "característica",
+        "cualidad", "propiedad", "posición", "categoría", "tipo", "clase", "especie", "género", "variedad", "versión", "etapa",
+        "fase", "nivel", "grado", "medida", "regla", "norma", "ley", "principio", "teoría", "práctica", "uso", "aplicación",
+        "ejemplo", "muestra", "modelo", "patrón", "diseño", "forma", "modo", "manera", "medio", "método"
+    ];
+
+    // Mapeo de errores comunes en español
+    const reglasCorrecion = [
+        // Reemplazos directos
+        { patron: /k/g, reemplazo: "qu" }, // keso -> queso
+        { patron: /k([e|i])/g, reemplazo: "qu$1" }, // keso -> queso, kilo -> quilo
+        { patron: /k([a|o|u])/g, reemplazo: "c$1" }, // kasa -> casa
+        { patron: /q([a|o|u])/g, reemplazo: "c$1" }, // qasa -> casa
+        { patron: /ç/g, reemplazo: "c" }, // françes -> frances
+        { patron: /ñ/g, reemplazo: "ñ" }, // nino -> niño (en este caso solo para verificar)
+        { patron: /n(?=o\\b)/g, reemplazo: "ñ" }, // nino -> niño (caso específico para "nino")
+        { patron: /\\bem\\b/g, reemplazo: "en" }, // em -> en
+        { patron: /\\bem([^aeioupyhxbcdfgklmnñqrstvwz])/g, reemplazo: "en$1" }, // emfermo -> enfermo
+        { patron: /\\ben([pbm])/g, reemplazo: "em$1" }, // enpresa -> empresa
+        { patron: /s(?=s)/g, reemplazo: "" }, // pressión -> presión
+        { patron: /ll(?=[ei])/g, reemplazo: "y" }, // llendo -> yendo
+        { patron: /y(?=ll)/g, reemplazo: "" }, // callendo -> cayendo
+        { patron: /g(?=[ei])/g, reemplazo: "gu$1" }, // gerra -> guerra
+        { patron: /ci(?=o)/g, reemplazo: "ci" }, // espaciozo -> espacioso
+        { patron: /ci(?=on)/g, reemplazo: "ci" }, // accion -> acción
+        { patron: /h(?=[aeiou])/g, reemplazo: "h" }, // allar -> hallar (solo para verificar)
+        { patron: /v/g, reemplazo: "b" }, // vien -> bien (en análisis caso por caso)
+        { patron: /b/g, reemplazo: "v" }, // biaje -> viaje (en análisis caso por caso)
+        { patron: /auqn/g, reemplazo: "aunq" }, // auqnue -> aunque
+        { patron: /escrt/g, reemplazo: "escrit" } // escrtia -> escrita
+    ];
+
+    // Errores específicos conocidos para mejorar la precisión
+    const erroresConocidos = {
+        "auqnue": "aunque",
+        "escrtia": "escrita",
+        "escrtio": "escrito",
+        "em": "en",
+        "nino": "niño",
+        "keso": "queso",
+        "kasa": "casa",
+        "i": "y",
+        "q": "que",
+        "k": "que",
+        "ola": "hola",
+        "hamijo": "amigo",
+        "haver": "haber"
+    };
+
+    // Función para calcular la distancia de Levenshtein (para sugerencias)
+    function distanciaLevenshtein(a, b) {
+        if (a.length === 0) return b.length;
+        if (b.length === 0) return a.length;
+
+        const matrix = [];
+
+        // Inicializar matriz
+        for (let i = 0; i <= b.length; i++) {
+            matrix[i] = [i];
+        }
+
+        for (let j = 0; j <= a.length; j++) {
+            matrix[0][j] = j;
+        }
+
+        // Llenar matriz
+        for (let i = 1; i <= b.length; i++) {
+            for (let j = 1; j <= a.length; j++) {
+                if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j - 1] + 1, // sustitución
+                        Math.min(
+                            matrix[i][j - 1] + 1, // inserción
+                            matrix[i - 1][j] + 1  // eliminación
+                        )
+                    );
+                }
+            }
+        }
+
+        return matrix[b.length][a.length];
+    }
+
+    // Función para verificar si una palabra podría ser un error ortográfico
+    function esPosibleError(palabra) {
+        // Palabras muy cortas probablemente no son errores
+        if (palabra.length <= 2) return false;
+
+        // Verificar si la palabra está en la lista de palabras correctas
+        if (palabrasCorrectas.includes(palabra.toLowerCase())) return false;
+
+        // Verificar si es un número (no es un error ortográfico)
+        if (!isNaN(palabra)) return false;
+
+        return true;
+    }
+
+    // Función para sugerir correcciones basadas en distancia de Levenshtein
+    function sugerirCorreccion(palabra) {
+        // Si es un error conocido, devolver la corrección
+        if (erroresConocidos[palabra.toLowerCase()]) {
+            return erroresConocidos[palabra.toLowerCase()];
+        }
+
+        // Aplicar reglas de corrección para errores comunes
+        let correccionPorReglas = palabra.toLowerCase();
+
+        for (const regla of reglasCorrecion) {
+            correccionPorReglas = correccionPorReglas.replace(regla.patron, regla.reemplazo);
+        }
+
+        // Si la palabra corregida por reglas es correcta, devolverla
+        if (palabrasCorrectas.includes(correccionPorReglas)) {
+            return correccionPorReglas;
+        }
+
+        // Buscar la palabra más cercana en el diccionario
+        let mejorSugerencia = null;
+        let menorDistancia = Infinity;
+
+        for (const palabraCorrecta of palabrasCorrectas) {
+            // Solo comparar con palabras de longitud similar para eficiencia
+            if (Math.abs(palabraCorrecta.length - palabra.length) <= 2) {
+                const distancia = distanciaLevenshtein(palabra.toLowerCase(), palabraCorrecta);
+
+                // Aceptar sugerencias que estén a una distancia razonable
+                if (distancia < menorDistancia && distancia <= 2) {
+                    mejorSugerencia = palabraCorrecta;
+                    menorDistancia = distancia;
+                }
+            }
+        }
+
+        // Si no encontramos una sugerencia razonable, devolver la corrección por reglas
+        return mejorSugerencia || correccionPorReglas;
+    }
+
+    document.getElementById('textInput').addEventListener('input', updateWordCount);
+    document.getElementById('checkButton').addEventListener('click', checkText);
+
+    function updateWordCount() {
+        const text = document.getElementById('textInput').value;
+        const wordCount = text.trim() ? text.trim().split(/\\s+/).length : 0;
+        document.getElementById('wordCount').textContent = wordCount;
+    }
+
+    function checkText() {
+        const text = document.getElementById('textInput').value.trim();
+
+        if (!text) {
+            alert('Por favor, ingresa algún texto para corregir.');
+            return;
+        }
+
+        // Dividir el texto en palabras
+        const words = text.split(/\\s+/);
+        const errorWords = [];
+        const correctedWords = [];
+
+        // Procesar cada palabra
+        words.forEach(word => {
+            // Eliminar signos de puntuación para la verificación
+            const cleanWord = word.toLowerCase().replace(/[.,;:!?()]/g, '');
+
+            if (cleanWord.length > 0) {
+                // Verificar si la palabra podría ser un error
+                if (esPosibleError(cleanWord)) {
+                    const sugerencia = sugerirCorreccion(cleanWord);
+
+                    // Solo considerar como error si hay una sugerencia diferente
+                    if (sugerencia && sugerencia.toLowerCase() !== cleanWord.toLowerCase()) {
+                        errorWords.push({
+                            original: word,
+                            cleanOriginal: cleanWord,
+                            suggested: sugerencia
+                        });
+
+                        // Conservar mayúsculas y puntuación en la palabra corregida
+                        const punctuation = word.match(/[.,;:!?()]/g) || [];
+                        let correctedWord = sugerencia;
+
+                        if (word[0] === word[0].toUpperCase()) {
+                            correctedWord = correctedWord.charAt(0).toUpperCase() + correctedWord.slice(1);
+                        }
+
+                        // Agregar puntuación si existía
+                        if (punctuation.length > 0) {
+                            correctedWord += punctuation.join('');
+                        }
+
+                        correctedWords.push(correctedWord);
+                    } else {
+                        correctedWords.push(word);
+                    }
+                } else {
+                    correctedWords.push(word);
+                }
+            } else {
+                correctedWords.push(word);
+            }
+        });
+
+        // Actualizar estadísticas
+        const totalWords = words.length;
+        const errorCount = errorWords.length;
+        const errorPercentage = totalWords > 0 ? Math.round((errorCount / totalWords) * 100) : 0;
+
+        document.getElementById('wordCount').textContent = totalWords;
+        document.getElementById('errorCount').textContent = errorCount;
+        document.getElementById('errorPercentage').textContent = errorPercentage + '%';
+
+        // Mostrar sugerencias
+        const resultsDiv = document.getElementById('correctionResults');
+        resultsDiv.innerHTML = '';
+
+        if (errorCount > 0) {
+            const suggestionTitle = document.createElement('h3');
+            suggestionTitle.textContent = 'Sugerencias de corrección:';
+            resultsDiv.appendChild(suggestionTitle);
+
+            errorWords.forEach(error => {
+                const suggestionDiv = document.createElement('div');
+                suggestionDiv.className = 'suggestion';
+
+                suggestionDiv.innerHTML = `
+                    "<span class="suggestion-original">${error.original}</span>"
+                    debería ser
+                    "<span class="suggestion-replacement">${error.suggested}</span>"
+                `;
+
+                resultsDiv.appendChild(suggestionDiv);
+            });
+
+            // Mostrar texto corregido
+            const correctedTextDiv = document.getElementById('correctedText');
+
+            // Crear una versión HTML del texto corregido con palabras marcadas
+            let correctedTextHtml = '';
+
+            words.forEach((word, index) => {
+                const cleanWord = word.toLowerCase().replace(/[.,;:!?()]/g, '');
+                const errorInfo = errorWords.find(e => e.original === word);
+
+                if (errorInfo) {
+                    correctedTextHtml += `<span class="error-word">${word}<div class="error-tooltip">Sugerencia: ${errorInfo.suggested}</div></span> `;
+                } else {
+                    correctedTextHtml += word + ' ';
+                }
+            });
+
+            correctedTextDiv.innerHTML = `
+                <h3>Texto con errores marcados:</h3>
+                <p>${correctedTextHtml}</p>
+                <h3>Texto corregido:</h3>
+                <p>${correctedWords.join(' ')}</p>
+            `;
+            correctedTextDiv.style.display = 'block';
+        } else {
+            resultsDiv.innerHTML = '<p>¡Felicitaciones! No se encontraron errores en el texto.</p>';
+            document.getElementById('correctedText').style.display = 'none';
+        }
+    }
+
+    // Inicialización
+    updateWordCount();
+</script>
+
+```
+
+</body>
+</html>
